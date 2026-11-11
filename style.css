@@ -35,7 +35,7 @@ section{padding:100px 5vw;content-visibility:auto;contain-intrinsic-size:auto 70
 .hero{min-height:100svh;display:flex;align-items:center;position:relative;overflow:hidden}
 .bg{position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(198,255,61,.22),transparent 45%),radial-gradient(circle at 5% 90%,rgba(91,61,255,.2),transparent 45%);animation:bgm 12s ease-in-out infinite alternate}
 @keyframes bgm{to{transform:scale(1.12) translate(-2%,2%)}}
-.hero .wrap{position:relative}
+.hero .wrap{position:relative;z-index:1}
 .pill{display:inline-block;border:1px solid var(--line);color:var(--ac);padding:6px 16px;border-radius:999px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:24px}
 .hero h1{font-size:clamp(2.5rem,9.5vw,7rem);letter-spacing:-.03em}
 .hero h1 em{font-style:normal;color:var(--ac);display:inline-block}
@@ -93,7 +93,7 @@ footer{border-top:1px solid var(--line);padding:24px 5vw;color:var(--mut);font-s
 @media(max-width:380px){.logo{font-size:1rem}.btn{padding:12px 18px}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01s!important;animation-iteration-count:1!important;transition:none!important}}
 
-.glow{position:fixed;left:0;top:0;width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:50%;background:var(--ac);opacity:.3;filter:blur(80px);pointer-events:none;z-index:2;will-change:transform;transform:translate3d(50vw,30vh,0)}
+.glow{position:absolute;left:0;top:0;width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:50%;background:var(--ac);opacity:.3;filter:blur(80px);pointer-events:none;z-index:0;will-change:transform;transform:translate3d(70vw,30vh,0)}
 section,.marq,footer{position:relative;z-index:1}
 .car{position:relative}
 .track{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;padding:4px 2px 8px}

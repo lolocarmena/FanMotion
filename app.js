@@ -54,10 +54,11 @@ setInterval(()=>{
   if(track.scrollLeft+track.clientWidth>=track.scrollWidth-4)track.scrollTo({left:0,behavior:"smooth"});
   else{const c=track.firstElementChild;track.scrollBy({left:(c?c.getBoundingClientRect().width:300)+18,behavior:"smooth"})}
 },3500);
-/* Luz de fondo desenfocada que sigue al cursor (movimiento suave) */
-if(window.matchMedia("(hover:hover)").matches){const gl=$(".glow");let tx=innerWidth/2,ty=innerHeight*.3,x=tx,y=ty,on=false;
+/* Luz desenfocada que sigue al cursor, solo en el header */
+const hero=$(".hero"),gl=$(".glow");
+if(hero&&gl&&window.matchMedia("(hover:hover)").matches){let tx=hero.clientWidth*.7,ty=hero.clientHeight*.3,x=tx,y=ty,on=false;
   const loop=()=>{x+=(tx-x)*.1;y+=(ty-y)*.1;gl.style.transform=`translate3d(${x}px,${y}px,0)`;if(Math.abs(tx-x)+Math.abs(ty-y)>.5)requestAnimationFrame(loop);else on=false};
-  addEventListener("pointermove",e=>{tx=e.clientX;ty=e.clientY;if(!on){on=true;requestAnimationFrame(loop)}},{passive:true});
+  hero.addEventListener("pointermove",e=>{const r=hero.getBoundingClientRect();tx=e.clientX-r.left;ty=e.clientY-r.top;if(!on){on=true;requestAnimationFrame(loop)}},{passive:true});
   gl.style.transform=`translate3d(${x}px,${y}px,0)`}
 async function loadProjects(){
   if(!sb){render();return}
