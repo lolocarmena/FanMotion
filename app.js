@@ -21,38 +21,48 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.targ
 document.querySelectorAll(".rv").forEach(x=>io.observe(x));
 const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting){if(!v.src)v.src=v.dataset.src;if(window.innerWidth<=820)v.play().catch(()=>{})}else v.pause()}),{rootMargin:"200px"});
 
-/* Galería: carrusel separado por orientación */
-let cur="h";
-const ori=x=>x.orient==="v"?"v":"h";
+/* Galería: carrusel automático (se frena con el cursor encima) */
+const track=$("#grid"),car=$(".car");let hov=false,hold=false,vis=true,tt=0;
 function media(it,full){
   if(it.type==="video"){const v=document.createElement("video");v.muted=true;v.loop=true;v.playsInline=true;v.preload="metadata";
+    v.addEventListener("loadedmetadata",()=>{if(v.videoHeight>v.videoWidth*1.05)v.classList.add("tall")});
     if(full){v.src=it.url;v.controls=true;v.muted=false;v.autoplay=true}else{v.dataset.src=it.url+"#t=0.1";vio.observe(v)}return v}
-  const i=document.createElement("img");i.src=it.url;i.alt=it.title;i.loading="lazy";i.decoding="async";return i}
-function updNav(){const t=$("#grid");$("#pv").disabled=t.scrollLeft<=4;$("#nx").disabled=t.scrollLeft+t.clientWidth>=t.scrollWidth-4}
+  const i=document.createElement("img");i.alt=it.title;i.loading="lazy";i.decoding="async";
+  i.onload=()=>{if(i.naturalHeight>i.naturalWidth*1.05)i.classList.add("tall")};i.src=it.url;return i}
+function updNav(){$("#pv").disabled=track.scrollLeft<=4;$("#nx").disabled=track.scrollLeft+track.clientWidth>=track.scrollWidth-4}
 function render(){
-  const g=$("#grid");g.replaceChildren();g.scrollLeft=0;
-  document.querySelectorAll("#seg button").forEach(b=>{b.classList.toggle("on",b.dataset.o===cur);b.querySelector("i").textContent=DATA.filter(x=>ori(x)===b.dataset.o).length});
-  const list=DATA.filter(x=>ori(x)===cur);
-  if(!list.length){g.appendChild(el("div","empty",DATA.length?"Todavía no hay proyectos en este formato. ✦":"Pronto vas a ver acá los proyectos. ✦"));updNav();return}
+  track.replaceChildren();track.scrollLeft=0;
+  if(!DATA.length){track.appendChild(el("div","empty","Pronto vas a ver acá los proyectos. ✦"));updNav();return}
   const fr=document.createDocumentFragment();
-  list.forEach(it=>{const c=el("div","card "+cur),m=media(it);c.appendChild(m);
+  DATA.forEach(it=>{const c=el("div","card"),m=media(it);c.appendChild(m);
     const cap=el("div","cap");cap.append(el("span","",it.title),el("span","tag",it.type==="video"?"Video":"Imagen"));c.appendChild(cap);
     if(it.type==="video"&&window.matchMedia("(hover:hover)").matches){c.onmouseenter=()=>m.play().catch(()=>{});c.onmouseleave=()=>m.pause()}
-    c.onclick=()=>{const b=$("#lbc");b.className="box "+cur;b.replaceChildren(media(it,true),el("h3","",it.title));$("#lb").classList.add("open")};fr.appendChild(c)});
-  g.appendChild(fr);updNav();
+    c.onclick=()=>{const b=$("#lbc");b.className="box";b.replaceChildren(media(it,true),el("h3","",it.title));$("#lb").classList.add("open")};fr.appendChild(c)});
+  track.appendChild(fr);updNav();
 }
-document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{cur=b.dataset.o;render()});
-$("#pv").onclick=()=>$("#grid").scrollBy({left:-$("#grid").clientWidth*.8,behavior:"smooth"});
-$("#nx").onclick=()=>$("#grid").scrollBy({left:$("#grid").clientWidth*.8,behavior:"smooth"});
-$("#grid").addEventListener("scroll",updNav,{passive:true});
+$("#pv").onclick=()=>track.scrollBy({left:-track.clientWidth*.8,behavior:"smooth"});
+$("#nx").onclick=()=>track.scrollBy({left:track.clientWidth*.8,behavior:"smooth"});
+track.addEventListener("scroll",updNav,{passive:true});
 window.addEventListener("resize",updNav,{passive:true});
-/* Luz de fondo que sigue al cursor */
-if(window.matchMedia("(hover:hover)").matches){const gl=$(".glow");let raf=0,x=0,y=0;
-  addEventListener("pointermove",e=>{x=e.clientX;y=e.clientY;if(!raf)raf=requestAnimationFrame(()=>{raf=0;gl.style.transform=`translate3d(${x}px,${y}px,0)`})},{passive:true})}
+/* Avance automático: pausa con el cursor encima, al tocar, fuera de pantalla o con un video abierto */
+car.addEventListener("mouseenter",()=>hov=true);car.addEventListener("mouseleave",()=>hov=false);
+car.addEventListener("touchstart",()=>{hold=true;clearTimeout(tt)},{passive:true});
+car.addEventListener("touchend",()=>{tt=setTimeout(()=>hold=false,5000)},{passive:true});
+new IntersectionObserver(e=>{vis=e[0].isIntersecting}).observe(car);
+setInterval(()=>{
+  if(hov||hold||!vis||document.hidden||$("#lb").classList.contains("open")||track.scrollWidth<=track.clientWidth+4)return;
+  if(track.scrollLeft+track.clientWidth>=track.scrollWidth-4)track.scrollTo({left:0,behavior:"smooth"});
+  else{const c=track.firstElementChild;track.scrollBy({left:(c?c.getBoundingClientRect().width:300)+18,behavior:"smooth"})}
+},3500);
+/* Luz de fondo desenfocada que sigue al cursor (movimiento suave) */
+if(window.matchMedia("(hover:hover)").matches){const gl=$(".glow");let tx=innerWidth/2,ty=innerHeight*.3,x=tx,y=ty,on=false;
+  const loop=()=>{x+=(tx-x)*.1;y+=(ty-y)*.1;gl.style.transform=`translate3d(${x}px,${y}px,0)`;if(Math.abs(tx-x)+Math.abs(ty-y)>.5)requestAnimationFrame(loop);else on=false};
+  addEventListener("pointermove",e=>{tx=e.clientX;ty=e.clientY;if(!on){on=true;requestAnimationFrame(loop)}},{passive:true});
+  gl.style.transform=`translate3d(${x}px,${y}px,0)`}
 async function loadProjects(){
   if(!sb){render();return}
   const {data}=await sb.from("projects").select("*").order("created_at",{ascending:false});
-  DATA=data||[];if(DATA.length&&!DATA.some(x=>ori(x)==="h"))cur="v";render();
+  DATA=data||[];render();
 }
 function closeAll(){document.querySelectorAll(".ov").forEach(o=>o.classList.remove("open"));const v=$("#lbc video");if(v)v.pause();$("#lbc").replaceChildren()}
 document.querySelectorAll("[data-c]").forEach(b=>b.onclick=closeAll);
@@ -118,12 +128,11 @@ function openAdmin(){
 }
 function viewProjects(body){
   body.replaceChildren();
-  const f=el("form");const ti=el("input");ti.placeholder="Título (opcional)";const or=el("select");[["h","16:9 · Horizontal"],["v","9:16 · Vertical"]].forEach(([v,t])=>{const o=el("option","",t);o.value=v;or.appendChild(o)});
+  const f=el("form");const ti=el("input");ti.placeholder="Título (opcional)";
   const fi=el("input");fi.type="file";fi.accept="video/*,image/*";fi.multiple=true;
-  const bt=el("button","btn","Subir");bt.type="submit";const ms=el("p","msg");f.append(ti,or,fi,bt,ms);
+  const bt=el("button","btn","Subir");bt.type="submit";const ms=el("p","msg");f.append(ti,fi,bt,ms);
   const list=el("div");body.append(f,list);
-  const draw=()=>{list.replaceChildren();DATA.forEach(it=>{const r=el("div","row");r.append(el("span","",(it.type==="video"?"🎬 ":"🖼 ")+(ori(it)==="v"?"9:16 · ":"16:9 · ")+it.title));
-    const tg=el("button","tg",ori(it)==="v"?"→ 16:9":"→ 9:16");tg.type="button";tg.onclick=async()=>{const o=ori(it)==="v"?"h":"v";tg.disabled=true;const {error}=await sb.from("projects").update({orient:o}).eq("id",it.id);if(error){ms.className="msg err";ms.textContent=error.message;tg.disabled=false;return}it.orient=o;render();draw()};r.append(tg);
+  const draw=()=>{list.replaceChildren();DATA.forEach(it=>{const r=el("div","row");r.append(el("span","",(it.type==="video"?"🎬 ":"🖼 ")+it.title));
     const d=el("button","","Eliminar");d.type="button";d.onclick=async()=>{if(!confirm("¿Eliminar \""+it.title+"\"?"))return;d.disabled=true;
       if(it.path)await sb.storage.from("media").remove([it.path]);const {error}=await sb.from("projects").delete().eq("id",it.id);
       if(error){ms.className="msg err";ms.textContent=error.message;d.disabled=false;return}
@@ -134,9 +143,9 @@ function viewProjects(body){
     try{for(const [i,file] of fs.entries()){ms.textContent=`Subiendo ${i+1}/${fs.length}: ${file.name}...`;
       const path=Date.now()+"_"+clean(file.name);const {error}=await sb.storage.from("media").upload(path,file,{cacheControl:"31536000"});if(error)throw error;
       const url=sb.storage.from("media").getPublicUrl(path).data.publicUrl;
-      const {data,error:e2}=await sb.from("projects").insert({title:(fs.length===1&&ti.value.trim())||file.name.replace(/\.[^.]+$/,""),type:file.type.startsWith("video")?"video":"image",orient:or.value,url,path}).select().single();
+      const {data,error:e2}=await sb.from("projects").insert({title:(fs.length===1&&ti.value.trim())||file.name.replace(/\.[^.]+$/,""),type:file.type.startsWith("video")?"video":"image",url,path}).select().single();
       if(e2)throw e2;DATA.unshift(data)}
-      ms.textContent="¡Listo!";fi.value="";ti.value="";cur=or.value;render();draw()}
+      ms.textContent="¡Listo!";fi.value="";ti.value="";render();draw()}
     catch(err){ms.className="msg err";ms.textContent="Error: "+err.message}
     bt.disabled=false};
 }
