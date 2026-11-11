@@ -23,6 +23,7 @@ create policy "admin borra media" on storage.objects for delete using (bucket_id
 create policy "cualquiera sube logos" on storage.objects for insert to anon, authenticated with check (bucket_id='logos');
 create policy "admin lee logos" on storage.objects for select using (bucket_id='logos' and is_admin());
 create policy "admin borra logos" on storage.objects for delete using (bucket_id='logos' and is_admin());
-alter table projects add column if not exists orient text not null default 'h' check (orient in ('h','v'));
+
 -- IMPORTANTE: reemplazá por TU correo (el mismo con el que te vas a registrar en la web)
-insert into admins(email) values ('lolo2002001@gmail.com') on conflict do nothing;
+insert into admins(email) values ('TU_CORREO@gmail.com') on conflict do nothing;
+
