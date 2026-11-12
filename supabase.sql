@@ -25,7 +25,7 @@ create policy "admin lee logos" on storage.objects for select using (bucket_id='
 create policy "admin borra logos" on storage.objects for delete using (bucket_id='logos' and is_admin());
 
 -- IMPORTANTE: reemplazá por TU correo (el mismo con el que te vas a registrar en la web)
-insert into admins(email) values ('lolo2002001@gmail.com') on conflict do nothing;
+insert into admins(email) values ('TU_CORREO@gmail.com') on conflict do nothing;
 
 
 -- SI YA HABÍAS EJECUTADO EL SQL ANTERIOR, corré también esta línea (miniaturas de video para que carguen al instante):

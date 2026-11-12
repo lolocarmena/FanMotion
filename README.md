@@ -37,3 +37,8 @@ Al subir un video, la página crea sola una miniatura para mostrarlo al instante
 
 ## Logos de pago
 Están dibujados como SVG dentro de `index.html`. Para usar los logos oficiales de cada marca, reemplazá el `<svg class="lg">` correspondiente por `<img class="lg" src="assets/pay/archivo.svg" alt="...">`.
+
+## Cambios: videos y logos de pago
+- **Optimización automática:** al subir un video desde el panel, la página mueve el índice del archivo al inicio (faststart) en tu navegador, sin recomprimir (calidad idéntica). Así arranca al instante. Los videos ya subidos antes no se optimizan: borralos y volvé a subirlos.
+- **Precarga:** al abrir la página cargan enseguida los primeros 4 videos y el resto se carga de a uno en segundo plano. Se reproducen en bucle al pasar el mouse o al abrirlos.
+- **Logo de Mercado Pago:** guardá el archivo oficial como `assets/pay/mercadopago.svg` (se descarga de la sección de marca de Mercado Pago) y la página lo usa automáticamente. Si el archivo no existe, muestra el nombre.

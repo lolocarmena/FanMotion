@@ -19,26 +19,26 @@ $("#wa1").href=$("#wa2").href=wa("Hola Juan Manuel, estoy interesado en tus serv
 /* Reveal + videos solo reproducen cuando se ven */
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.1});
 document.querySelectorAll(".rv").forEach(x=>io.observe(x));
-const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting){if(!v.getAttribute("src"))v.src=v.dataset.src;v.preload="auto";if(window.innerWidth<=820)v.play().catch(()=>{})}else v.pause()}),{rootMargin:"300px"});
+const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting)v.play().catch(()=>{});else v.pause()}),{threshold:.4});
 
 /* Galería: carrusel automático (se frena con el cursor encima) */
 const track=$("#grid"),car=$(".car");let hov=false,hold=false,vis=true,tt=0;
 function media(it,full){
   if(it.type==="video"){const v=document.createElement("video");v.muted=true;v.loop=true;v.playsInline=true;v.preload="metadata";
     if(it.poster)v.poster=it.poster;v.addEventListener("loadedmetadata",()=>{if(v.videoHeight>v.videoWidth*1.05)v.classList.add("tall")});
-    if(full){v.src=it.url;v.controls=true;v.muted=false;v.autoplay=true}else{v.dataset.src=it.url+"#t=0.1";vio.observe(v)}return v}
+    if(full){v.src=it.url;v.controls=true;v.muted=false;v.autoplay=true;v.addEventListener("canplay",()=>{if(v.paused)v.play().catch(()=>{v.muted=true;v.play().catch(()=>{})})},{once:true})}else{v.src=it.url;if(window.innerWidth<=820)vio.observe(v)}return v}
   const i=document.createElement("img");i.alt=it.title;i.loading="lazy";i.decoding="async";
   i.onload=()=>{if(i.naturalHeight>i.naturalWidth*1.05)i.classList.add("tall")};i.src=it.url;return i}
 function updNav(){$("#pv").disabled=track.scrollLeft<=4;$("#nx").disabled=track.scrollLeft+track.clientWidth>=track.scrollWidth-4}
 function render(){
-  track.replaceChildren();track.scrollLeft=0;
+  track.replaceChildren();track.scrollLeft=0;let vc=0;const warm=[];
   if(!DATA.length){track.appendChild(el("div","empty","Pronto vas a ver acá los proyectos. ✦"));updNav();return}
   const fr=document.createDocumentFragment();
-  DATA.forEach(it=>{const c=el("div","card"),m=media(it);c.appendChild(m);
+  DATA.forEach(it=>{const c=el("div","card"),m=media(it);c.appendChild(m);if(m.tagName==="VIDEO"){if(vc++<4)m.preload="auto";else warm.push(m)}
     const cap=el("div","cap");cap.append(el("span","",it.title),el("span","tag",it.type==="video"?"Video":"Imagen"));c.appendChild(cap);
-    if(it.type==="video"&&window.matchMedia("(hover:hover)").matches){c.onmouseenter=()=>{if(!m.getAttribute("src"))m.src=m.dataset.src;m.preload="auto";m.play().catch(()=>{})};c.onmouseleave=()=>m.pause()}
+    if(it.type==="video"&&window.matchMedia("(hover:hover)").matches){c.onmouseenter=()=>{m.preload="auto";m.play().catch(()=>{})};c.onmouseleave=()=>m.pause()}
     c.onclick=()=>{const b=$("#lbc");b.className="box";b.replaceChildren(media(it,true),el("h3","",it.title));$("#lb").classList.add("open")};fr.appendChild(c)});
-  track.appendChild(fr);updNav();
+  track.appendChild(fr);updNav();warmUp(warm);
 }
 $("#pv").onclick=()=>track.scrollBy({left:-track.clientWidth*.8,behavior:"smooth"});
 $("#nx").onclick=()=>track.scrollBy({left:track.clientWidth*.8,behavior:"smooth"});
@@ -68,6 +68,35 @@ if(hero&&gl){
     new IntersectionObserver(e=>{seen=e[0].isIntersecting}).observe(hero);
     const d=t=>{if(seen&&!document.hidden){if(t>nt){pick();nt=t+5000+Math.random()*3000}x+=(tx-x)*.006;y+=(ty-y)*.006;put()}requestAnimationFrame(d)};
     requestAnimationFrame(d)}
+}
+/* Precarga escalonada: los primeros videos cargan ya; el resto de a uno, sin saturar la conexión */
+function warmUp(list){const c=navigator.connection;if(!list.length||(c&&(c.saveData||/2g/.test(c.effectiveType||""))))return;
+  let i=0;const next=()=>{if(i>=list.length)return;list[i++].preload="auto";setTimeout(next,700)};
+  (window.requestIdleCallback||setTimeout)(next,1200)}
+/* Optimización automática SIN perder calidad: mueve el índice (moov) al inicio del MP4/MOV para que arranque al instante */
+async function faststart(file){
+  try{
+    if(file.size>1.5e9)return file;
+    const top=[];
+    for(let o=0;o<file.size;){
+      const d=new DataView(await file.slice(o,o+16).arrayBuffer());if(d.byteLength<8)return file;
+      let size=d.getUint32(0);const type=String.fromCharCode(d.getUint8(4),d.getUint8(5),d.getUint8(6),d.getUint8(7));
+      if(size===1){if(d.byteLength<16)return file;size=Number(d.getBigUint64(8))}else if(size===0)size=file.size-o;
+      if(size<8||o+size>file.size)return file;
+      top.push({o,size,type});o+=size}
+    const mi=top.findIndex(b=>b.type==="moov"),di=top.findIndex(b=>b.type==="mdat");
+    if(mi<0||di<0||mi<di||top.some(b=>b.type==="moof"))return file;
+    const mv=top[mi],md=top[di],S=mv.size;
+    const m=new Uint8Array(await file.slice(mv.o,mv.o+mv.size).arrayBuffer()),dv=new DataView(m.buffer);
+    const boxes=new Set(["moov","trak","mdia","minf","stbl"]);
+    const walk=(s,e)=>{for(let o=s;o+8<=e;){const sz=dv.getUint32(o),t=String.fromCharCode(m[o+4],m[o+5],m[o+6],m[o+7]);if(sz<8)break;
+      if(boxes.has(t))walk(o+8,o+sz);
+      else if(t==="stco"){const n=dv.getUint32(o+12);for(let i=0;i<n;i++){const p=o+16+4*i;dv.setUint32(p,dv.getUint32(p)+S)}}
+      else if(t==="co64"){const n=dv.getUint32(o+12);for(let i=0;i<n;i++){const p=o+16+8*i;dv.setBigUint64(p,dv.getBigUint64(p)+BigInt(S))}}
+      o+=sz}};
+    walk(8,m.length);
+    return new Blob([file.slice(0,md.o),m,file.slice(md.o,mv.o),file.slice(mv.o+mv.size)],{type:"video/mp4"});
+  }catch(e){return file}
 }
 /* Miniatura (poster) del video para mostrar al instante */
 function makePoster(file){return new Promise(res=>{const v=document.createElement("video"),u=URL.createObjectURL(file);let ok=false;
@@ -158,7 +187,9 @@ function viewProjects(body){
   f.onsubmit=async e=>{e.preventDefault();const fs=[...fi.files];if(!fs.length){ms.className="msg err";ms.textContent="Elegí un archivo.";return}
     bt.disabled=true;ms.className="msg";
     try{for(const [i,file] of fs.entries()){ms.textContent=`Subiendo ${i+1}/${fs.length}: ${file.name}`+(file.size>20e6?` (${Math.round(file.size/1e6)} MB: conviene optimizarlo, ver README)`:"")+"...";
-      const path=Date.now()+"_"+clean(file.name);const {error}=await sb.storage.from("media").upload(path,file,{cacheControl:"31536000"});if(error)throw error;
+      const isV=file.type.startsWith("video")||/\.(mp4|mov|m4v)$/i.test(file.name);let up=file;
+      if(isV){ms.textContent=`Optimizando ${file.name} (arranque instantáneo, sin perder calidad)...`;up=await faststart(file);ms.textContent=`Subiendo ${i+1}/${fs.length}: ${file.name}...`}
+      const path=Date.now()+"_"+clean(file.name).replace(/\.mov$/i,".mp4");const {error}=await sb.storage.from("media").upload(path,up,{cacheControl:"31536000",contentType:isV?"video/mp4":(file.type||undefined)});if(error)throw error;
       const url=sb.storage.from("media").getPublicUrl(path).data.publicUrl;let poster=null;
       if(file.type.startsWith("video")){const pb=await makePoster(file);if(pb){const pp="posters/"+path+".jpg";const {error:pe}=await sb.storage.from("media").upload(pp,pb,{contentType:"image/jpeg",cacheControl:"31536000"});if(!pe)poster=sb.storage.from("media").getPublicUrl(pp).data.publicUrl}}
       const row={title:(fs.length===1&&ti.value.trim())||file.name.replace(/\.[^.]+$/,""),type:file.type.startsWith("video")?"video":"image",url,path,poster};let r2=await sb.from("projects").insert(row).select().single();if(r2.error&&/poster/i.test(r2.error.message)){delete row.poster;r2=await sb.from("projects").insert(row).select().single()}if(r2.error)throw r2.error;const data=r2.data;DATA.unshift(data)}
