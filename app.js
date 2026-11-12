@@ -19,13 +19,13 @@ $("#wa1").href=$("#wa2").href=wa("Hola Juan Manuel, estoy interesado en tus serv
 /* Reveal + videos solo reproducen cuando se ven */
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.1});
 document.querySelectorAll(".rv").forEach(x=>io.observe(x));
-const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting){if(!v.src)v.src=v.dataset.src;if(window.innerWidth<=820)v.play().catch(()=>{})}else v.pause()}),{rootMargin:"200px"});
+const vio=new IntersectionObserver(es=>es.forEach(e=>{const v=e.target;if(e.isIntersecting){if(!v.getAttribute("src"))v.src=v.dataset.src;v.preload="auto";if(window.innerWidth<=820)v.play().catch(()=>{})}else v.pause()}),{rootMargin:"300px"});
 
 /* Galería: carrusel automático (se frena con el cursor encima) */
 const track=$("#grid"),car=$(".car");let hov=false,hold=false,vis=true,tt=0;
 function media(it,full){
   if(it.type==="video"){const v=document.createElement("video");v.muted=true;v.loop=true;v.playsInline=true;v.preload="metadata";
-    v.addEventListener("loadedmetadata",()=>{if(v.videoHeight>v.videoWidth*1.05)v.classList.add("tall")});
+    if(it.poster)v.poster=it.poster;v.addEventListener("loadedmetadata",()=>{if(v.videoHeight>v.videoWidth*1.05)v.classList.add("tall")});
     if(full){v.src=it.url;v.controls=true;v.muted=false;v.autoplay=true}else{v.dataset.src=it.url+"#t=0.1";vio.observe(v)}return v}
   const i=document.createElement("img");i.alt=it.title;i.loading="lazy";i.decoding="async";
   i.onload=()=>{if(i.naturalHeight>i.naturalWidth*1.05)i.classList.add("tall")};i.src=it.url;return i}
@@ -36,7 +36,7 @@ function render(){
   const fr=document.createDocumentFragment();
   DATA.forEach(it=>{const c=el("div","card"),m=media(it);c.appendChild(m);
     const cap=el("div","cap");cap.append(el("span","",it.title),el("span","tag",it.type==="video"?"Video":"Imagen"));c.appendChild(cap);
-    if(it.type==="video"&&window.matchMedia("(hover:hover)").matches){c.onmouseenter=()=>m.play().catch(()=>{});c.onmouseleave=()=>m.pause()}
+    if(it.type==="video"&&window.matchMedia("(hover:hover)").matches){c.onmouseenter=()=>{if(!m.getAttribute("src"))m.src=m.dataset.src;m.preload="auto";m.play().catch(()=>{})};c.onmouseleave=()=>m.pause()}
     c.onclick=()=>{const b=$("#lbc");b.className="box";b.replaceChildren(media(it,true),el("h3","",it.title));$("#lb").classList.add("open")};fr.appendChild(c)});
   track.appendChild(fr);updNav();
 }
@@ -54,12 +54,28 @@ setInterval(()=>{
   if(track.scrollLeft+track.clientWidth>=track.scrollWidth-4)track.scrollTo({left:0,behavior:"smooth"});
   else{const c=track.firstElementChild;track.scrollBy({left:(c?c.getBoundingClientRect().width:300)+18,behavior:"smooth"})}
 },3500);
-/* Luz desenfocada que sigue al cursor, solo en el header */
+/* Luz del header: sigue al cursor (PC) o deriva lentamente al azar (celular) */
 const hero=$(".hero"),gl=$(".glow");
-if(hero&&gl&&window.matchMedia("(hover:hover)").matches){let tx=hero.clientWidth*.7,ty=hero.clientHeight*.3,x=tx,y=ty,on=false;
-  const loop=()=>{x+=(tx-x)*.1;y+=(ty-y)*.1;gl.style.transform=`translate3d(${x}px,${y}px,0)`;if(Math.abs(tx-x)+Math.abs(ty-y)>.5)requestAnimationFrame(loop);else on=false};
-  hero.addEventListener("pointermove",e=>{const r=hero.getBoundingClientRect();tx=e.clientX-r.left;ty=e.clientY-r.top;if(!on){on=true;requestAnimationFrame(loop)}},{passive:true});
-  gl.style.transform=`translate3d(${x}px,${y}px,0)`}
+if(hero&&gl){
+  const fine=window.matchMedia("(any-pointer:fine)").matches,still=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  let tx=hero.clientWidth*.7,ty=hero.clientHeight*.3,x=tx,y=ty;
+  const put=()=>{gl.style.transform=`translate3d(${x}px,${y}px,0)`};put();
+  if(fine){let on=false;
+    const loop=()=>{x+=(tx-x)*.1;y+=(ty-y)*.1;put();if(Math.abs(tx-x)+Math.abs(ty-y)>.5)requestAnimationFrame(loop);else on=false};
+    hero.addEventListener("pointermove",e=>{if(e.pointerType==="touch")return;const r=hero.getBoundingClientRect();tx=e.clientX-r.left;ty=e.clientY-r.top;if(!on){on=true;requestAnimationFrame(loop)}},{passive:true})
+  }else if(!still){let nt=0,seen=true;
+    const pick=()=>{tx=hero.clientWidth*(.1+Math.random()*.8);ty=hero.clientHeight*(.1+Math.random()*.8)};
+    new IntersectionObserver(e=>{seen=e[0].isIntersecting}).observe(hero);
+    const d=t=>{if(seen&&!document.hidden){if(t>nt){pick();nt=t+5000+Math.random()*3000}x+=(tx-x)*.006;y+=(ty-y)*.006;put()}requestAnimationFrame(d)};
+    requestAnimationFrame(d)}
+}
+/* Miniatura (poster) del video para mostrar al instante */
+function makePoster(file){return new Promise(res=>{const v=document.createElement("video"),u=URL.createObjectURL(file);let ok=false;
+  const done=b=>{if(ok)return;ok=true;URL.revokeObjectURL(u);res(b)};
+  v.muted=true;v.playsInline=true;v.preload="metadata";
+  v.onloadedmetadata=()=>{v.currentTime=Math.min(1,(v.duration||2)/3)};
+  v.onseeked=()=>{try{const s=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement("canvas");c.width=Math.round(v.videoWidth*s);c.height=Math.round(v.videoHeight*s);c.getContext("2d").drawImage(v,0,0,c.width,c.height);c.toBlob(done,"image/jpeg",.82)}catch(e){done(null)}};
+  v.onerror=()=>done(null);setTimeout(()=>done(null),8000);v.src=u})}
 async function loadProjects(){
   if(!sb){render();return}
   const {data}=await sb.from("projects").select("*").order("created_at",{ascending:false});
@@ -135,17 +151,17 @@ function viewProjects(body){
   const list=el("div");body.append(f,list);
   const draw=()=>{list.replaceChildren();DATA.forEach(it=>{const r=el("div","row");r.append(el("span","",(it.type==="video"?"🎬 ":"🖼 ")+it.title));
     const d=el("button","","Eliminar");d.type="button";d.onclick=async()=>{if(!confirm("¿Eliminar \""+it.title+"\"?"))return;d.disabled=true;
-      if(it.path)await sb.storage.from("media").remove([it.path]);const {error}=await sb.from("projects").delete().eq("id",it.id);
+      if(it.path)await sb.storage.from("media").remove([it.path,"posters/"+it.path+".jpg"]);const {error}=await sb.from("projects").delete().eq("id",it.id);
       if(error){ms.className="msg err";ms.textContent=error.message;d.disabled=false;return}
       DATA=DATA.filter(x=>x.id!==it.id);render();draw()};r.append(d);list.append(r)})};
   draw();
   f.onsubmit=async e=>{e.preventDefault();const fs=[...fi.files];if(!fs.length){ms.className="msg err";ms.textContent="Elegí un archivo.";return}
     bt.disabled=true;ms.className="msg";
-    try{for(const [i,file] of fs.entries()){ms.textContent=`Subiendo ${i+1}/${fs.length}: ${file.name}...`;
+    try{for(const [i,file] of fs.entries()){ms.textContent=`Subiendo ${i+1}/${fs.length}: ${file.name}`+(file.size>20e6?` (${Math.round(file.size/1e6)} MB: conviene optimizarlo, ver README)`:"")+"...";
       const path=Date.now()+"_"+clean(file.name);const {error}=await sb.storage.from("media").upload(path,file,{cacheControl:"31536000"});if(error)throw error;
-      const url=sb.storage.from("media").getPublicUrl(path).data.publicUrl;
-      const {data,error:e2}=await sb.from("projects").insert({title:(fs.length===1&&ti.value.trim())||file.name.replace(/\.[^.]+$/,""),type:file.type.startsWith("video")?"video":"image",url,path}).select().single();
-      if(e2)throw e2;DATA.unshift(data)}
+      const url=sb.storage.from("media").getPublicUrl(path).data.publicUrl;let poster=null;
+      if(file.type.startsWith("video")){const pb=await makePoster(file);if(pb){const pp="posters/"+path+".jpg";const {error:pe}=await sb.storage.from("media").upload(pp,pb,{contentType:"image/jpeg",cacheControl:"31536000"});if(!pe)poster=sb.storage.from("media").getPublicUrl(pp).data.publicUrl}}
+      const row={title:(fs.length===1&&ti.value.trim())||file.name.replace(/\.[^.]+$/,""),type:file.type.startsWith("video")?"video":"image",url,path,poster};let r2=await sb.from("projects").insert(row).select().single();if(r2.error&&/poster/i.test(r2.error.message)){delete row.poster;r2=await sb.from("projects").insert(row).select().single()}if(r2.error)throw r2.error;const data=r2.data;DATA.unshift(data)}
       ms.textContent="¡Listo!";fi.value="";ti.value="";render();draw()}
     catch(err){ms.className="msg err";ms.textContent="Error: "+err.message}
     bt.disabled=false};
